@@ -5,7 +5,8 @@
  */
 return [
     // 管理后台访问密钥，例如访问 /admin/?key=xxxxxx
-    'admin_key' => 'admin12', // TODO: 请修改为随机复杂字符串
+    'admin_key' => '登陆admin_key', // TODO: 请修改为随机复杂字符串
 ];
+
 
 
