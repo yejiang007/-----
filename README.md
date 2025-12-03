@@ -1,2 +1,372 @@
 # -----
 摩托车赛事直播实时数据动态显示直播间/参考知识 个性指令 深度思考 18/1000  Live Streaming of Motorcycle Race Events with Real-Time Data Display in the Live Room
+摩托车越野锦标赛2025 Web端实时排名系统 - 开发说明文档
+## 1. 文档概述
+### 1.1 文档目的
+本文档为「CMX中国摩托车越野锦标赛2025 Web端实时排名系统」提供完整的开发规范、技术方案及实施指南，明确系统功能边界、技术选型、数据结构、接口设计及部署要求，确保开发过程符合专业赛事的数据实时性、准确性及稳定性要求，为开发人员、测试人员及运维人员提供统一参考标准。
+
+### 1.2 系统定位
+本系统是面向CMX中国摩托车越野锦标赛2025赛季的专业Web端应用，核心功能为向观众实时展示参赛选手的基础信息及动态排名数据，支持赛事直播期间的低延迟数据同步，满足专业赛事对数据公开、透明、实时的核心诉求。
+
+### 1.3 核心功能清单
+| 功能模块       | 核心需求                                                                 |
+|----------------|--------------------------------------------------------------------------|
+| 选手基础信息展示 | 展示选手名称、选手头像、车号、国籍、车队名称、参赛序号                   |
+| 实时排名展示   | 展示选手当前排名、分组信息，支持排名动态刷新（延迟≤1秒）                 |
+| 数据同步       | 与赛事计时系统实时对接，同步更新排名及相关状态数据                       |
+| 分组筛选       | 支持按比赛分组（如85cc组、250cc组等）筛选展示对应选手数据               |
+| 响应式适配     | 支持PC端、平板等Web访问设备的自适应显示                                 |
+
+## 2. 技术架构
+### 2.1 开发环境
+| 环境类型       | 技术栈详情                                                                 |
+|----------------|--------------------------------------------------------------------------|
+| 后端开发语言   | PHP 8.1+（兼容JIT编译，提升高并发处理性能）                               |
+| 数据库         | MySQL 8.0+（支持InnoDB引擎、事务及索引优化，保障数据一致性）               |
+| Web服务器      | Nginx 1.20+（配合PHP-FPM实现FastCGI解析，优化并发请求处理）               |
+| 前端技术       | HTML5 + CSS3 + JavaScript（原生开发，减少依赖，提升加载速度）             |
+| 数据传输协议   | WebSocket（实时推送排名更新）+ HTTP/HTTPS（静态资源加载、接口请求）       |
+| 开发工具       | PHPStorm、Navicat、Postman（接口测试）、Git（版本控制）                   |
+
+### 2.2 系统架构图
+```
+┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
+│  赛事计时系统   │      │  后端服务层     │      │  Web前端层      │
+│  （数据源头）   │───→  │  PHP + MySQL    │───→  │  实时展示页面   │
+└─────────────────┘      └─────────────────┘      └─────────────────┘
+        │                        │                        │
+        │  推送实时数据          │  存储/查询/推送数据    │  接收WebSocket推送
+        └────────────────────────┘                        └────────────────
+```
+
+### 2.3 数据库实例信息
+- **数据库类型**：MySQL 8.0+
+- **数据库名称**：`mtc2025_ly7_cn`
+- **数据库字符集**：`utf8mb4`
+- **数据库用户名**：由运维统一配置（建议使用专用业务账号，禁止使用 `root`）
+- **数据库密码**：`eCK9WXrhwcwsaH3f`（仅用于本项目实时排名系统，禁止复用到其他系统）
+
+
+## 3. 数据库设计
+### 3.1 核心数据表结构
+#### 3.1.1 选手信息表（`cmx_players`）
+| 字段名         | 数据类型         | 长度   | 主键/索引 | 非空 | 说明                                                                 |
+|----------------|------------------|--------|-----------|------|----------------------------------------------------------------------|
+| player_id      | INT              | 11     | 主键      | 是   | 选手唯一标识ID（自增）                                               |
+| player_name    | VARCHAR          | 50     | 普通索引  | 是   | 选手名称（如“张三”“Li Ming”）                                        |
+| avatar_url     | VARCHAR          | 255    | -         | 是   | 选手头像URL（建议存储CDN地址，支持HTTPS）                             |
+| car_number     | VARCHAR          | 20     | 唯一索引  | 是   | 车号（如“88”“123A”，赛事内唯一）                                     |
+| nationality    | VARCHAR          | 30     | -         | 是   | 国籍（如“中国”“美国”“日本”，统一中文表述）                           |
+| team_name      | VARCHAR          | 100    | 普通索引  | 是   | 车队名称（如“CMX Racing Team”“中国越野车队”）                         |
+| entry_number   | VARCHAR          | 20     | 唯一索引  | 是   | 参赛序号（赛事官方分配，如“CMX2025-085”，全局唯一）                   |
+| group_id       | INT              | 11     | 普通索引  | 是   | 分组ID（关联`cmx_groups`表）                                         |
+| create_time    | DATETIME         | -      | -         | 是   | 数据创建时间（默认`CURRENT_TIMESTAMP`）                               |
+| update_time    | DATETIME         | -      | -         | 是   | 数据更新时间（默认`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`）   |
+
+#### 3.1.2 分组信息表（`cmx_groups`）
+| 字段名         | 数据类型         | 长度   | 主键/索引 | 非空 | 说明                                                                 |
+|----------------|------------------|--------|-----------|------|----------------------------------------------------------------------|
+| group_id       | INT              | 11     | 主键      | 是   | 分组唯一标识ID（自增）                                               |
+| group_name     | VARCHAR          | 50     | 唯一索引  | 是   | 分组名称（如“85cc青少年组”“250cc公开组”“450cc专业组”）               |
+| group_code     | VARCHAR          | 20     | 唯一索引  | 是   | 分组编码（如“85CC-J”“250CC-O”，用于前端筛选标识）                     |
+| status         | TINYINT          | 1      | -         | 是   | 分组状态（1-赛事中，2-已结束，0-未开始）                             |
+| create_time    | DATETIME         | -      | -         | 是   | 数据创建时间                                                         |
+
+#### 3.1.3 实时排名表（`cmx_realtime_ranking`）
+| 字段名         | 数据类型         | 长度   | 主键/索引 | 非空 | 说明                                                                 |
+|----------------|------------------|--------|-----------|------|----------------------------------------------------------------------|
+| ranking_id     | BIGINT           | 20     | 主键      | 是   | 排名记录唯一ID（自增，用于日志追溯）                                 |
+| player_id      | INT              | 11     | 联合索引  | 是   | 选手ID（关联`cmx_players`表）                                         |
+| group_id       | INT              | 11     | 联合索引  | 是   | 分组ID（关联`cmx_groups`表）                                         |
+| current_rank   | INT              | 11     | -         | 是   | 当前排名（1为第一名，依次递增）                                       |
+| lap_time       | DECIMAL          | 10,2   | -         | 否   | 最新圈速（单位：秒，非必填，如热身赛无圈速数据）                     |
+| gap_time       | DECIMAL          | 10,2   | -         | 否   | 与领先者的时间差距（单位：秒，领先者为0.00）                         |
+| update_time    | DATETIME         | -      | 普通索引  | 是   | 排名更新时间（精确到秒，用于前端排序和刷新判断）                     |
+
+### 3.2 索引优化说明
+- `cmx_players`：为`player_name`、`car_number`、`entry_number`、`group_id`建立索引，优化选手信息查询效率；
+- `cmx_groups`：为`group_code`、`status`建立索引，优化分组筛选和状态查询；
+- `cmx_realtime_ranking`：建立`(group_id, update_time)`联合索引，确保按分组查询最新排名时的高效性；建立`player_id`索引，支持通过选手ID快速查询排名。
+
+### 3.3 数据一致性保障
+- 采用InnoDB引擎，通过事务确保`cmx_realtime_ranking`表的更新原子性（避免排名更新时数据错乱）；
+- 实时排名表仅存储当前最新状态，历史排名数据可通过定时任务归档至`cmx_ranking_history`表（可选扩展），避免主表数据量过大影响查询速度。
+
+## 4. 后端开发规范
+### 4.1 目录结构设计
+```
+cmx-ranking-system/
+├── api/                  # 接口层
+│   ├── player.php        # 选手信息接口
+│   ├── group.php         # 分组接口
+│   └── ranking.php       # 实时排名接口
+├── service/              # 业务逻辑层
+│   ├── PlayerService.php # 选手信息业务处理
+│   ├── GroupService.php  # 分组业务处理
+│   └── RankingService.php# 排名业务处理
+├── model/                # 数据模型层
+│   ├── PlayerModel.php   # 选手表操作
+│   ├── GroupModel.php    # 分组表操作
+│   └── RankingModel.php  # 排名表操作
+├── config/               # 配置文件
+│   ├── db.php            # 数据库配置（账号、密码、库名等，需加密存储）
+│   └── websocket.php     # WebSocket配置
+├── util/                 # 工具类
+│   ├── Db.php            # 数据库连接工具（单例模式）
+│   ├── Log.php           # 日志工具（记录接口请求、数据更新日志）
+│   └── Validate.php      # 数据校验工具
+└── websocket/            # WebSocket服务
+    └── RankingWebSocket.php # 实时推送服务
+```
+
+### 4.2 接口设计（RESTful + WebSocket）
+#### 4.2.1 HTTP接口（用于初始化数据）
+##### 4.2.1.1 获取分组列表
+- 接口地址：`/api/group.php?action=getList`
+- 请求方式：GET
+- 响应格式：JSON
+- 响应示例：
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": [
+    {
+      "group_id": 1,
+      "group_name": "85cc青少年组",
+      "group_code": "85CC-J",
+      "status": 1
+    },
+    {
+      "group_id": 2,
+      "group_name": "250cc公开组",
+      "group_code": "250CC-O",
+      "status": 1
+    }
+  ]
+}
+```
+
+##### 4.2.1.2 获取指定分组选手及当前排名
+- 接口地址：`/api/ranking.php?action=getGroupRanking`
+- 请求方式：GET
+- 请求参数：`group_id`（分组ID，必填）
+- 响应格式：JSON
+- 响应示例：
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "group_info": {
+      "group_id": 1,
+      "group_name": "85cc青少年组",
+      "status": 1
+    },
+    "ranking_list": [
+      {
+        "player_id": 101,
+        "player_name": "张三",
+        "avatar_url": "https://mtc2025.ly7.cn/img/img.png",
+        "car_number": "88",
+        "nationality": "中国",
+        "team_name": "CMX青少年车队",
+        "entry_number": "CMX2025-085-001",
+        "current_rank": 1,
+        "lap_time": 95.23,
+        "gap_time": 0.00,
+        "update_time": "2025-05-20 14:30:25"
+      },
+      {
+        "player_id": 102,
+        "player_name": "Li Ming",
+        "avatar_url": "https://mtc2025.ly7.cn/img/img.png",
+        "car_number": "99",
+        "nationality": "中国",
+        "team_name": "极速越野车队",
+        "entry_number": "CMX2025-085-002",
+        "current_rank": 2,
+        "lap_time": 96.58,
+        "gap_time": 1.35,
+        "update_time": "2025-05-20 14:30:25"
+      }
+    ]
+  }
+}
+```
+
+#### 4.2.2 WebSocket接口（用于实时推送）
+- 连接地址：`ws://[域名]/websocket/RankingWebSocket.php`
+- 连接参数：`group_id`（可选，指定监听某分组的排名更新；不指定则监听所有分组）
+- 推送格式：JSON
+- 推送示例（排名更新时）：
+```json
+{
+  "type": "ranking_update",
+  "group_id": 1,
+  "update_time": "2025-05-20 14:30:26",
+  "data": {
+    "player_id": 103,
+    "player_name": "Wang Hua",
+    "current_rank": 2,
+    "gap_time": 1.89,
+    "lap_time": 96.12
+  }
+}
+```
+
+### 4.3 核心业务逻辑
+#### 4.3.1 数据同步逻辑
+1. 与赛事计时系统对接：通过HTTP回调或TCP长连接接收赛事计时系统推送的实时数据（包含选手车号、圈速、排名等）；
+2. 数据解析与校验：后端接收数据后，通过`Validate.php`校验数据完整性（车号、圈速、排名等字段必填）；
+3. 数据关联与更新：
+   - 根据车号查询`cmx_players`表获取`player_id`和`group_id`；
+   - 调用`RankingService.php`更新`cmx_realtime_ranking`表的`current_rank`、`lap_time`、`gap_time`及`update_time`；
+4. 实时推送：通过WebSocket服务将更新后的排名数据推送给所有订阅该分组的前端用户。
+
+#### 4.3.2 高并发处理
+- 采用PHP-FPM进程池优化，配置合理的`pm.max_children`（建议根据服务器CPU核心数设置，如8核服务器设为16）；
+- 对`cmx_realtime_ranking`表的查询操作添加缓存（可选Redis），缓存过期时间设为1秒，减少数据库查询压力；
+- WebSocket服务采用多进程模式，支持同时连接1000+用户（专业赛事观众量级）。
+
+### 4.4 日志与异常处理
+- 所有接口请求、数据更新、WebSocket连接/断开事件均记录至日志（存储路径：`/var/log/cmx-ranking/`），日志格式包含“时间戳+操作类型+数据+状态”；
+- 数据库操作失败、接口参数错误、WebSocket连接异常等场景需抛出异常并记录详细信息，同时返回统一的错误码（如500-服务器错误，400-参数错误）；
+- 定时清理7天前的日志文件，避免磁盘空间占用过大。
+
+### 4.5 数据库初始化脚本（`mtc2025_ly7_cn.sql`）
+- **脚本作用**：
+  - 创建数据库`mtc2025_ly7_cn`（如无权限需提前在面板中手动创建）；
+  - 删除并重建三张核心业务表：`cmx_groups`、`cmx_players`、`cmx_realtime_ranking`；
+  - 初始化少量分组示例数据、选手示例数据及对应的实时排名示例数据，方便联调和前端展示。
+- **使用方式**：
+  - 开发/测试环境推荐在命令行执行：`mysql -u{user} -p mtc2025_ly7_cn < mtc2025_ly7_cn.sql`；
+  - 若通过phpMyAdmin导入，先创建库`mtc2025_ly7_cn`，然后从`USE mtc2025_ly7_cn;`行开始执行脚本；
+  - 生产环境禁止直接覆盖已有业务数据，如需结构更新须先备份并评估影响。
+
+### 4.6 PHP 数据库配置与访问规范
+- **数据库配置文件（`config/db.php`）示例**：
+  ```php
+  <?php
+  return [
+      'host'     => '127.0.0.1',
+      'port'     => 3306,
+      'dbname'   => 'mtc2025_ly7_cn',
+      'username' => '【实际数据库用户名】',
+      'password' => '【实际数据库密码，例如：eCK9WXrhwcwsaH3f】',
+      'charset'  => 'utf8mb4',
+  ];
+  ```
+- **数据库连接工具（`util/Db.php`）约定**：
+  - 采用PDO单例模式管理连接，避免每次请求重复创建连接对象；
+  - 统一开启`PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION`，便于异常捕获与日志记录；
+  - 默认使用`PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC`，简化数据访问。
+  ```php
+  <?php
+  class Db {
+      private static ?PDO $instance = null;
+      private function __construct() {}
+      private function __clone() {}
+      public static function getInstance(): PDO {
+          if (self::$instance === null) {
+              $config = require __DIR__ . '/../config/db.php';
+              $dsn = sprintf(
+                  'mysql:host=%s;port=%d;dbname=%s;charset=%s',
+                  $config['host'], $config['port'], $config['dbname'], $config['charset']
+              );
+              self::$instance = new PDO($dsn, $config['username'], $config['password'], [
+                  PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                  PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                  PDO::ATTR_PERSISTENT         => true,
+              ]);
+          }
+          return self::$instance;
+      }
+  }
+  ```
+- **Model 层访问规范**：
+  - 所有模型类统一通过`Db::getInstance()`获取PDO连接；
+  - 查询类操作统一使用预处理语句，防止SQL注入；
+  - 需要事务的场景（如批量更新排名）统一由Service层开启/提交/回滚事务，Model层只负责单次SQL执行。
+  ```php
+  <?php
+  class GroupModel {
+      private PDO $db;
+      public function __construct() {
+          $this->db = Db::getInstance();
+      }
+      public function getList(): array {
+          $sql = 'SELECT group_id, group_name, group_code, status FROM cmx_groups ORDER BY group_id ASC';
+          return $this->db->query($sql)->fetchAll();
+      }
+  }
+  ```
+
+## 5. 前端开发规范
+### 5.1 页面结构
+- 页面分为「分组筛选区」「实时排名展示区」「选手详情弹窗」三部分；
+- 排名展示区采用表格或卡片布局，按`current_rank`降序排列，突出显示当前排名（如第一名标红，前三名标不同颜色）；
+- 支持选手头像懒加载，避免页面初始化加载过慢。
+
+### 5.2 数据交互逻辑
+1. 页面加载时，先调用HTTP接口获取分组列表和默认分组的选手排名数据，完成初始化渲染；
+2. 建立WebSocket连接，订阅当前选中分组的排名更新；
+3. 接收WebSocket推送的更新数据后，对比本地数据的`update_time`，仅更新最新数据，避免重复渲染；
+4. 切换分组时，断开当前WebSocket订阅，重新订阅新分组，并调用HTTP接口获取新分组的完整排名数据。
+
+### 5.3 响应式适配
+- 采用CSS3 Media Query适配不同屏幕尺寸：
+  - PC端（屏幕宽度≥1200px）：显示完整表格（包含所有字段）；
+  - 平板端（768px≤屏幕宽度<1200px）：隐藏“参赛序号”字段，优化表格布局；
+- 页面加载速度要求：初始化渲染≤2秒，排名更新响应≤1秒。
+
+## 6. 数据安全与稳定性
+### 6.1 数据安全
+- 数据库账号密码存储在配置文件中，配置文件权限设为`600`（仅所有者可读写），避免泄露；
+- WebSocket连接采用`wss://`加密协议（生产环境），防止数据传输过程中被篡改；
+- 接口添加签名验证（可选）：前端请求时携带`timestamp`（时间戳）和`sign`（签名，由请求参数+密钥MD5加密生成），后端验证签名有效性，防止恶意请求。
+
+### 6.2 稳定性保障
+- 后端服务部署在云服务器，配置负载均衡（可选，针对高并发场景）；
+- 数据库开启主从复制，主库负责写入，从库负责查询，避免单库压力过大；
+- WebSocket连接添加重连机制：若连接断开，前端每3秒尝试重连，直至连接成功；
+- 定时任务（如每分钟）检查`cmx_realtime_ranking`表的最新更新时间，若超过5分钟无更新，前端显示“数据加载中”提示，并触发后端数据同步校验。
+
+## 7. 部署与测试
+### 7.1 部署流程
+1. 服务器环境配置：安装PHP 8.1+、MySQL 8.0+、Nginx 1.20+，启用PHP-FPM和WebSocket扩展；
+2. 数据库部署：创建数据库`mtc2025_ly7_cn`，执行SQL脚本创建数据表，导入初始选手信息和分组数据；
+3. 代码部署：将后端代码上传至服务器`/var/www/cmx-ranking-system/`，配置Nginx虚拟主机，指向`api/`目录；
+4. 启动WebSocket服务：通过`nohup php websocket/RankingWebSocket.php &`后台运行，配置开机自启；
+5. 域名解析：将赛事官方域名（如`ranking.cmx2025.com`）解析至服务器IP，配置HTTPS证书。
+
+### 7.2 测试要点
+| 测试类型       | 测试内容                                                                 |
+|----------------|--------------------------------------------------------------------------|
+| 功能测试       | 分组筛选、排名更新、选手信息展示、WebSocket重连等功能是否正常             |
+| 性能测试       | 模拟1000+用户同时在线，测试页面加载速度、排名更新延迟、服务器CPU/内存占用 |
+| 稳定性测试     | 连续运行72小时，检查日志是否有异常，排名数据是否一致                     |
+| 兼容性测试     | 测试Chrome、Firefox、Safari等主流浏览器，确保页面正常显示和功能可用       |
+
+## 8. 维护与扩展
+### 8.1 日常维护
+- 每日检查服务器状态（CPU、内存、磁盘空间）和日志文件，及时处理异常；
+- 赛事期间安排专人值守，若出现数据同步异常，可手动触发数据同步接口；
+- 定期备份数据库（每日凌晨1点全量备份，保存30天）。
+
+### 8.2 扩展功能（可选）
+- 历史排名查询：添加`cmx_ranking_history`表，存储每圈的排名数据，支持查看选手排名变化趋势；
+- 选手积分统计：关联赛事积分规则，实时计算选手的锦标赛总积分；
+- 直播画面嵌入：在排名页面嵌入赛事直播视频流，实现“排名+直播”联动展示。
+
+## 9. 版本说明
+| 版本号 | 更新日期   | 更新内容                     |
+|--------|------------|------------------------------|
+| V1.0   | 2025-01-01 | 初始版本，实现核心功能       |
+| V1.1   | 2025-03-01 | 优化WebSocket重连机制，添加日志清理功能 |
+| V1.2   | 2025-04-01 | 支持HTTPS，添加接口签名验证   |
+
+## 10. 联系方式
+- 开发负责人：XXX
+- 技术支持：XXX（赛事期间24小时在线）
+- 数据库维护：XXX
