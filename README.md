@@ -1,5 +1,16 @@
-# -----
+<img width="1224" height="707" alt="6468c8b00486bd62e478193fed9ac459" src="https://github.com/user-attachments/assets/c4d3f937-1614-4c0d-b853-8a2193248eb2" />
+
+选手界面后台动态调用
+-<img width="1224" height="707" alt="3d84964def771b659e60631212b84384" src="https://github.com/user-attachments/assets/e7051d5f-ed06-4ae4-8e82-8652feda62a5" /><img width="351" height="240" alt="907de8e2bcb137beead2f39b68bf6ee2" src="https://github.com/user-attachments/assets/af97637d-285f-48e9-8e7b-7ada96c9ff6f" />
+排名实时动态自动调整
+
+<img width="1224" height="707" alt="ae430e2e18c733ac3a5f0ac377495fef" src="https://github.com/user-attachments/assets/3a74fcef-9a3f-461f-a64a-3cafe49d42b5" />
+
+<img width="1101" height="795" alt="61cdb8112daa1e113fcba9eb389fd876" src="https://github.com/user-attachments/assets/e45c5392-4df1-45e7-bffa-2691f87e5da9" />
+后台界面
+
 摩托车赛事直播实时数据动态显示直播间/参考知识 个性指令 深度思考 18/1000  Live Streaming of Motorcycle Race Events with Real-Time Data Display in the Live Room
+
 摩托车越野锦标赛2025 Web端实时排名系统 - 开发说明文档
 ## 1. 文档概述
 ### 1.1 文档目的
