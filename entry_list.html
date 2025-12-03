@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>CMX 中国摩托车越野锦标赛 2025 - 参赛车手出场名单</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            background: #0b1120;
+            color: #e5e7eb;
+        }
+        header {
+            padding: 16px 24px;
+            background: linear-gradient(90deg, #0f172a, #1d4ed8);
+            color: #f9fafb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+        #groupSelect {
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid #4b5563;
+            background: #020617;
+            color: #e5e7eb;
+        }
+        main {
+            padding: 16px;
+            display: flex;
+            gap: 20px;
+        }
+        .entry-list-container {
+            background: #020617;
+            border-radius: 8px;
+            padding: 20px;
+            flex: 1;
+        }
+        .sponsors-container {
+            background: #020617;
+            border-radius: 8px;
+            padding: 20px;
+            width: 300px;
+            min-width: 250px;
+        }
+        .sponsors-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #e5e7eb;
+            text-align: center;
+        }
+        .sponsors-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .sponsor-item {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 80px;
+            transition: transform 0.2s ease;
+        }
+        .sponsor-item:hover {
+            transform: scale(1.05);
+        }
+        .sponsor-logo {
+            max-width: 100%;
+            max-height: 50px;
+            object-fit: contain;
+            margin-bottom: 8px;
+        }
+        .sponsor-name {
+            font-size: 11px;
+            color: #1f2937;
+            text-align: center;
+            word-break: break-word;
+        }
+        .entry-list-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #e5e7eb;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        th, td {
+            padding: 20px 20px;
+            border-bottom: 1px solid #111827;
+            text-align: left;
+            line-height: 1.4;
+        }
+        th {
+            background: #0f172a;
+            color: #9ca3af;
+            font-weight: 500;
+            font-size: 18px;
+        }
+        .car-number {
+            font-size: 28px;
+            font-weight: 700;
+            color: #3b82f6;
+        }
+        .player-name {
+            font-size: 22px;
+            font-weight: 600;
+        }
+        .team-name {
+            font-size: 18px;
+            color: #9ca3af;
+        }
+        tbody tr {
+            transition: background-color 0.2s ease, opacity 0.5s ease;
+        }
+        tbody tr:hover {
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        tbody {
+            display: block;
+            max-height: 640px;
+            overflow: hidden;
+            transition: opacity 0.5s ease;
+        }
+        thead tr {
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+        }
+        tbody tr {
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+        }
+        /* 设置列宽以确保对齐 */
+        th:nth-child(1), td:nth-child(1) {
+            width: 15%;
+        }
+        th:nth-child(2), td:nth-child(2) {
+            width: 10%;
+        }
+        th:nth-child(3), td:nth-child(3) {
+            width: 35%;
+        }
+        th:nth-child(4), td:nth-child(4) {
+            width: 40%;
+        }
+        /* 添加滚动动画样式 */
+        .scroll-container {
+            position: relative;
+            overflow: hidden;
+            height: 640px;
+            will-change: transform;
+            backface-visibility: hidden;
+            perspective: 1000px;
+        }
+        .scroll-content {
+            animation: scroll-up 60s linear infinite;
+            transform: translateZ(0);
+            backface-visibility: hidden;
+        }
+        @keyframes scroll-up {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-100%); }
+        }
+        .flag {
+            font-size: 16px;
+            margin-right: 4px;
+        }
+        .player-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #3b82f6;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .avatar-cell {
+            text-align: center;
+            padding: 10px;
+        }
+        .entry-order {
+            font-weight: 600;
+            color: #3b82f6;
+        }
+        @media (max-width: 1024px) {
+            main {
+                flex-direction: column;
+            }
+            .sponsors-container {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+<header>
+    <div>
+        <h1>CMX 中国摩托车越野锦标赛 2025 - 参赛车手出场名单</h1>
+    </div>
+    <div>
+        <select id="groupSelect"></select>
+    </div>
+</header>
+<main>
+    <div class="entry-list-container">
+        <div class="entry-list-title" id="groupTitle">出场名单</div>
+        <table>
+            <thead>
+            <tr>
+                <th>车号</th>
+                <th>头像</th>
+                <th>车手</th>
+                <th>车队</th>
+            </tr>
+            </thead>
+            <tbody id="entryBody">
+            </tbody>
+        </table>
+    </div>
+    <div class="sponsors-container">
+        <div class="sponsors-title">赞助商</div>
+        <div class="sponsors-grid" id="sponsorsGrid"></div>
+    </div>
+</main>
+<script>
+    const apiBase = '/api';
+    let currentGroupId = null;
+    let refreshTimer = null;
+    let scrollTimer = null;
+    let currentPage = 0;
+    let allPlayers = [];
+    const PLAYERS_PER_PAGE = 8;
+
+    async function fetchGroups() {
+        try {
+            const res = await fetch(`${apiBase}/group.php?action=getList`);
+            const json = await res.json();
+            if (json.code !== 200) {
+                console.error('获取分组列表失败:', json.msg);
+                return;
+            }
+            const select = document.getElementById('groupSelect');
+            select.innerHTML = '';
+            json.data.forEach(g => {
+                const opt = document.createElement('option');
+                opt.value = g.group_id;
+                opt.textContent = `${g.group_name} (${g.group_code})`;
+                select.appendChild(opt);
+            });
+            if (json.data.length > 0) {
+                // 检查URL参数中是否有指定的分组ID
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlGroupId = urlParams.get('group_id');
+                
+                if (urlGroupId && json.data.find(g => g.group_id == urlGroupId)) {
+                    currentGroupId = parseInt(urlGroupId);
+                } else {
+                    currentGroupId = json.data[0].group_id;
+                }
+                
+                select.value = currentGroupId;
+                await fetchEntryList(currentGroupId);
+                startAutoRefresh();
+            } else {
+                document.getElementById('entryBody').innerHTML = '<tr><td colspan="3" style="text-align:center; color:#9ca3af;">暂无分组数据</td></tr>';
+            }
+            select.addEventListener('change', async () => {
+                currentGroupId = select.value;
+                await fetchEntryList(currentGroupId);
+                // 切换分组时重新启动自动刷新
+                startAutoRefresh();
+            });
+        } catch (e) {
+            console.error('加载分组列表出错:', e);
+            // 使用模拟分组数据
+            const mockGroups = [
+                { group_id: 1, group_name: '专业组', group_code: 'PRO' },
+                { group_id: 2, group_name: '业余组', group_code: 'AMATEUR' },
+                { group_id: 3, group_name: '青少年组', group_code: 'YOUTH' }
+            ];
+            const select = document.getElementById('groupSelect');
+            select.innerHTML = '';
+            mockGroups.forEach(g => {
+                const opt = document.createElement('option');
+                opt.value = g.group_id;
+                opt.textContent = `${g.group_name} (${g.group_code})`;
+                select.appendChild(opt);
+            });
+            
+            currentGroupId = mockGroups[0].group_id;
+            select.value = currentGroupId;
+            await fetchEntryList(currentGroupId);
+            startAutoRefresh();
+            
+            select.addEventListener('change', async () => {
+                currentGroupId = select.value;
+                await fetchEntryList(currentGroupId);
+                startAutoRefresh();
+            });
+        }
+    }
+
+    async function fetchEntryList(groupId) {
+        // 添加时间戳防止缓存
+        const timestamp = new Date().getTime();
+        try {
+            const res = await fetch(`${apiBase}/entry_list.php?action=getList&group_id=${groupId}&_t=${timestamp}`, {
+                cache: 'no-cache',
+                headers: {
+                    'Cache-Control': 'no-cache'
+                }
+            });
+            const json = await res.json();
+            
+            if (json.code !== 200) {
+                console.error('获取出场名单失败:', json.msg);
+                document.getElementById('entryBody').innerHTML = '<tr><td colspan="4" style="text-align:center; color:#9ca3af;">加载失败：' + (json.msg || '未知错误') + '</td></tr>';
+                return;
+            }
+            
+            const groupSelect = document.getElementById('groupSelect');
+            const selectedOption = groupSelect.options[groupSelect.selectedIndex];
+            document.getElementById('groupTitle').textContent = `出场名单 · ${selectedOption.textContent}`;
+            
+            // 确保 data 是数组
+            const data = Array.isArray(json.data) ? json.data : [];
+            renderEntryList(data);
+        } catch (e) {
+            console.error('请求出错:', e);
+            // 使用模拟数据测试（基于数据库真实头像链接）
+            const mockData = [
+                { player_name: '张三', car_number: '88', nationality: '中国', team_name: 'CMX青少年车队', entry_order: 1, avatar_url: 'https://cdn.cmx.com/avatars/101.jpg' },
+                { player_name: '李强', car_number: '21', nationality: '中国', team_name: '岭南少年越野队', entry_order: 2, avatar_url: 'https://cdn.cmx.com/avatars/102.jpg' },
+                { player_name: 'Wang Hua', car_number: '66', nationality: '中国', team_name: '飞驰越野车队', entry_order: 3, avatar_url: 'https://cdn.cmx.com/avatars/103.jpg' },
+                { player_name: 'Chen Yu', car_number: '15', nationality: '中国', team_name: '星火青训车队', entry_order: 4, avatar_url: 'https://cdn.cmx.com/avatars/104.jpg' },
+                { player_name: 'John Doe', car_number: '18', nationality: '美国', team_name: 'International Racing Team', entry_order: 5, avatar_url: 'https://cdn.cmx.com/avatars/201.jpg' },
+                { player_name: 'Tanaka', car_number: '28', nationality: '日本', team_name: 'Samurai MX Team', entry_order: 6, avatar_url: 'https://cdn.cmx.com/avatars/202.jpg' },
+                { player_name: 'Alex Martin', car_number: '12', nationality: '法国', team_name: 'Euro Speed MX', entry_order: 7, avatar_url: 'https://cdn.cmx.com/avatars/203.jpg' },
+                { player_name: 'Carlos Ruiz', car_number: '34', nationality: '西班牙', team_name: 'Iberia Offroad', entry_order: 8, avatar_url: 'https://cdn.cmx.com/avatars/204.jpg' },
+                { player_name: 'Kevin Smith', car_number: '57', nationality: '英国', team_name: 'London MX Club', entry_order: 9, avatar_url: 'https://cdn.cmx.com/avatars/205.jpg' },
+                { player_name: 'Matsuda', car_number: '72', nationality: '日本', team_name: 'Samurai MX Team', entry_order: 10, avatar_url: 'https://cdn.cmx.com/avatars/206.jpg' },
+                { player_name: 'Luca Rossi', car_number: '39', nationality: '意大利', team_name: 'Roma Racing', entry_order: 11, avatar_url: 'https://cdn.cmx.com/avatars/207.jpg' },
+                { player_name: 'Jack Brown', car_number: '63', nationality: '澳大利亚', team_name: 'Sydney MX Squad', entry_order: 12, avatar_url: 'https://cdn.cmx.com/avatars/208.jpg' }
+            ];
+            const groupSelect = document.getElementById('groupSelect');
+            const selectedOption = groupSelect.options[groupSelect.selectedIndex];
+            document.getElementById('groupTitle').textContent = `出场名单 · ${selectedOption.textContent}`;
+            renderEntryList(mockData);
+        }
+    }
+
+    function startAutoRefresh() {
+        if (refreshTimer) {
+            clearInterval(refreshTimer);
+        }
+        // 立即刷新一次
+        if (currentGroupId) {
+            fetchEntryList(currentGroupId);
+        }
+        fetchSponsors();
+        // 然后每3秒刷新一次
+        refreshTimer = setInterval(() => {
+            if (currentGroupId) {
+                fetchEntryList(currentGroupId);
+            }
+            fetchSponsors();
+        }, 3000); // 每3秒刷新一次
+    }
+
+    function stopAutoRefresh() {
+        if (refreshTimer) {
+            clearInterval(refreshTimer);
+            refreshTimer = null;
+        }
+        stopAutoScroll();
+    }
+
+    function getFlag(nationality) {
+        const map = {
+            '中国': '🇨🇳', '中国大陆': '🇨🇳', '香港': '🇭🇰', '澳门': '🇲🇴', '台湾': '🇹🇼',
+            '美国': '🇺🇸', '日本': '🇯🇵', '韩国': '🇰🇷', '英国': '🇬🇧', '法国': '🇫🇷',
+            '德国': '🇩🇪', '意大利': '🇮🇹', '西班牙': '🇪🇸', '澳大利亚': '🇦🇺'
+        };
+        return map[nationality] || '🏁';
+    }
+
+    function renderEntryList(list) {
+        if (!list || list.length === 0) {
+            const tbody = document.getElementById('entryBody');
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#9ca3af; font-size:18px;">暂无出场名单数据</td></tr>';
+            allPlayers = [];
+            stopAutoScroll();
+            return;
+        }
+        
+        // 按出场顺序排序
+        const sortedList = [...list].sort((a, b) => {
+            const orderA = a.entry_order ?? 9999;
+            const orderB = b.entry_order ?? 9999;
+            return orderA - orderB;
+        });
+        
+        allPlayers = sortedList;
+        
+        // 如果总数不超过8条，直接显示，不滚动
+        if (allPlayers.length <= PLAYERS_PER_PAGE) {
+            renderStaticList();
+            stopAutoScroll();
+            return;
+        }
+        
+        // 超过8条时，使用无限循环滚动
+        renderContinuousList();
+        startAutoScroll();
+    }
+
+    function renderStaticList() {
+        const tbody = document.getElementById('entryBody');
+        tbody.innerHTML = '';
+        
+        allPlayers.forEach(row => {
+            const tr = document.createElement('tr');
+            const flag = getFlag(row.nationality || '');
+            const avatarUrl = row.avatar_url || '/img/img.png';
+            tr.innerHTML = `
+                 <td><span class="car-number">${row.car_number || '-'}</span></td>
+                 <td class="avatar-cell"><img src="${avatarUrl}" alt="${row.player_name || ''}" class="player-avatar" loading="lazy" decoding="async" width="60" height="60" onerror="this.src='/img/img.png'"></td>
+                 <td><span class="flag">${flag}</span><span class="player-name">${row.player_name || '-'}</span></td>
+                 <td><span class="team-name">${row.team_name || '-'}</span></td>
+             `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function renderContinuousList() {
+        const tbody = document.getElementById('entryBody');
+        tbody.innerHTML = '';
+        
+        // 创建滚动容器
+        const scrollContainer = document.createElement('div');
+        scrollContainer.className = 'scroll-container';
+        
+        // 创建滚动内容
+        const scrollContent = document.createElement('div');
+        scrollContent.className = 'scroll-content';
+        
+        // 为了无缝循环，我们需要复制内容三次，确保平滑过渡
+        for (let i = 0; i < 3; i++) {
+            allPlayers.forEach(row => {
+                const tr = document.createElement('tr');
+                const flag = getFlag(row.nationality || '');
+                const avatarUrl = row.avatar_url || '/img/img.png';
+                tr.innerHTML = `
+                    <td><span class="car-number">${row.car_number || '-'}</span></td>
+                    <td class="avatar-cell"><img src="${avatarUrl}" alt="${row.player_name || ''}" class="player-avatar" loading="lazy" decoding="async" width="60" height="60" onerror="this.src='/img/img.png'"></td>
+                    <td><span class="flag">${flag}</span><span class="player-name">${row.player_name || '-'}</span></td>
+                    <td><span class="team-name">${row.team_name || '-'}</span></td>
+                `;
+                scrollContent.appendChild(tr);
+            });
+        }
+        
+        scrollContainer.appendChild(scrollContent);
+        tbody.appendChild(scrollContainer);
+    }
+
+    function startAutoScroll() {
+        if (scrollTimer) {
+            clearInterval(scrollTimer);
+        }
+        
+        // 如果总数不超过8条，不滚动
+        if (allPlayers.length <= PLAYERS_PER_PAGE) {
+            return;
+        }
+        
+        // 使用CSS动画实现无限循环滚动
+        // 动画已经在CSS中定义，这里不需要额外的JavaScript定时器
+    }
+
+    function stopAutoScroll() {
+        if (scrollTimer) {
+            clearInterval(scrollTimer);
+            scrollTimer = null;
+        }
+    }
+
+    async function fetchSponsors() {
+        try {
+            const res = await fetch(`${apiBase}/sponsor.php?action=getList`);
+            const json = await res.json();
+            if (json.code === 200 && Array.isArray(json.data)) {
+                renderSponsors(json.data);
+            }
+        } catch (e) {
+            console.error('加载赞助商失败:', e);
+            // 使用模拟赞助商数据
+            const mockSponsors = [
+                { sponsor_name: '极速轮胎', logo_url: 'https://via.placeholder.com/120x50/3b82f6/ffffff?text=极速轮胎' },
+                { sponsor_name: '动力机油', logo_url: 'https://via.placeholder.com/120x50/ef4444/ffffff?text=动力机油' },
+                { sponsor_name: '赛车装备', logo_url: 'https://via.placeholder.com/120x50/10b981/ffffff?text=赛车装备' },
+                { sponsor_name: '专业维修', logo_url: 'https://via.placeholder.com/120x50/f59e0b/ffffff?text=专业维修' },
+                { sponsor_name: '安全头盔', logo_url: 'https://via.placeholder.com/120x50/8b5cf6/ffffff?text=安全头盔' },
+                { sponsor_name: '高性能配件', logo_url: 'https://via.placeholder.com/120x50/06b6d4/ffffff?text=高性能配件' }
+            ];
+            renderSponsors(mockSponsors);
+        }
+    }
+
+    function renderSponsors(list) {
+        const container = document.getElementById('sponsorsGrid');
+        container.innerHTML = '';
+        
+        if (!list || list.length === 0) {
+            container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; color:#9ca3af; padding:20px;">暂无赞助商</div>';
+            return;
+        }
+        
+        list.forEach(sponsor => {
+            const div = document.createElement('div');
+            div.className = 'sponsor-item';
+            div.innerHTML = `
+                <img src="${sponsor.logo_url}" alt="${sponsor.sponsor_name}" class="sponsor-logo" onerror="this.style.display='none'">
+                <div class="sponsor-name">${sponsor.sponsor_name || ''}</div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    // 页面可见性检测：当页面重新可见时立即刷新数据
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && currentGroupId) {
+            fetchEntryList(currentGroupId);
+            fetchSponsors();
+            startAutoRefresh();
+        } else {
+            stopAutoRefresh();
+        }
+    });
+
+    // 窗口获得焦点时刷新数据
+    window.addEventListener('focus', () => {
+        if (currentGroupId) {
+            fetchEntryList(currentGroupId);
+            fetchSponsors();
+            startAutoRefresh();
+        }
+    });
+
+    // 窗口失去焦点时停止自动刷新（节省资源）
+    window.addEventListener('blur', () => {
+        stopAutoRefresh();
+    });
+
+    fetchGroups();
+    fetchSponsors();
+</script>
+</body>
+</html>
+

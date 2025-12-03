@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>CMX 赞助商管理</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            background: #0b1120;
+            color: #e5e7eb;
+        }
+        header {
+            padding: 12px 16px;
+            background: #020617;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #111827;
+        }
+        main {
+            padding: 12px 16px;
+        }
+        input, button, select {
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #4b5563;
+            background: #020617;
+            color: #e5e7eb;
+            font-size: 13px;
+        }
+        .form-group {
+            margin-bottom: 12px;
+        }
+        .form-group label {
+            display: inline-block;
+            width: 100px;
+            font-size: 12px;
+            color: #9ca3af;
+        }
+        .form-group input {
+            width: 300px;
+        }
+        .sponsors-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .sponsor-card {
+            background: #020617;
+            border: 1px solid #111827;
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .sponsor-logo-preview {
+            width: 100%;
+            height: 80px;
+            object-fit: contain;
+            background: #ffffff;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        .sponsor-name {
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+        .sponsor-actions {
+            margin-top: 8px;
+            display: flex;
+            gap: 4px;
+        }
+        .sponsor-actions button {
+            flex: 1;
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+        .add-form {
+            background: #020617;
+            border: 1px solid #111827;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        .status {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <div>
+        <strong>CMX 赞助商管理</strong>
+        <span class="status" id="statusText"></span>
+    </div>
+    <div>
+        密钥：
+        <input type="password" id="keyInput" placeholder="admin key" style="width: 140px;">
+        <button id="loadBtn">加载</button>
+    </div>
+</header>
+<main>
+    <div class="add-form">
+        <h3 style="margin-top: 0;">添加赞助商</h3>
+        <div class="form-group">
+            <label>赞助商名称：</label>
+            <input type="text" id="sponsorName" placeholder="例如：Masontex">
+        </div>
+        <div class="form-group">
+            <label>Logo URL：</label>
+            <input type="text" id="logoUrl" placeholder="https://cdn.cmx.com/sponsors/logo.png">
+        </div>
+        <div class="form-group">
+            <label>显示顺序：</label>
+            <input type="number" id="displayOrder" value="0" style="width: 100px;">
+        </div>
+        <div class="form-group">
+            <label>状态：</label>
+            <select id="status" style="width: 100px;">
+                <option value="1">显示</option>
+                <option value="0">隐藏</option>
+            </select>
+        </div>
+        <button onclick="addSponsor()">添加</button>
+    </div>
+    <div class="sponsors-grid" id="sponsorsGrid"></div>
+</main>
+<script>
+    const apiBase = '/api';
+    const keyInput = document.getElementById('keyInput');
+    const statusText = document.getElementById('statusText');
+
+    async function loadSponsors() {
+        const key = keyInput.value.trim();
+        if (!key) {
+            alert('请先填写密钥');
+            return;
+        }
+        const url = `${apiBase}/admin_sponsor.php?action=list&key=${encodeURIComponent(key)}`;
+        const res = await fetch(url);
+        const json = await res.json();
+        if (json.code !== 200) {
+            statusText.textContent = ' 加载失败：' + json.msg;
+            document.getElementById('sponsorsGrid').innerHTML = '';
+            return;
+        }
+        statusText.textContent = ' 已加载 ' + json.data.sponsor_list.length + ' 条';
+        renderSponsors(json.data.sponsor_list);
+    }
+
+    function renderSponsors(list) {
+        const grid = document.getElementById('sponsorsGrid');
+        grid.innerHTML = '';
+        list.forEach(sponsor => {
+            const card = document.createElement('div');
+            card.className = 'sponsor-card';
+            card.innerHTML = `
+                <img src="${sponsor.logo_url}" alt="${sponsor.sponsor_name}" class="sponsor-logo-preview" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23ddd%22 width=%22100%22 height=%22100%22/%3E%3Ctext x=%2250%22 y=%2250%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22%3ENo Logo%3C/text%3E%3C/svg%3E'">
+                <div class="sponsor-name"><strong>${sponsor.sponsor_name}</strong></div>
+                <div style="font-size: 11px; color: #9ca3af;">顺序：${sponsor.display_order} | 状态：${sponsor.status === 1 ? '显示' : '隐藏'}</div>
+                <div class="sponsor-actions">
+                    <button onclick="editSponsor(${sponsor.sponsor_id}, '${sponsor.sponsor_name.replace(/'/g, "\\'")}', '${sponsor.logo_url}', ${sponsor.display_order}, ${sponsor.status})">编辑</button>
+                    <button onclick="deleteSponsor(${sponsor.sponsor_id})">删除</button>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    }
+
+    async function addSponsor() {
+        const key = keyInput.value.trim();
+        const sponsorName = document.getElementById('sponsorName').value.trim();
+        const logoUrl = document.getElementById('logoUrl').value.trim();
+        const displayOrder = parseInt(document.getElementById('displayOrder').value) || 0;
+        const status = parseInt(document.getElementById('status').value) || 1;
+
+        if (!key || !sponsorName || !logoUrl) {
+            alert('请填写完整信息');
+            return;
+        }
+
+        const form = new FormData();
+        form.append('action', 'add');
+        form.append('key', key);
+        form.append('sponsor_name', sponsorName);
+        form.append('logo_url', logoUrl);
+        form.append('display_order', displayOrder);
+        form.append('status', status);
+
+        const res = await fetch(`${apiBase}/admin_sponsor.php`, {
+            method: 'POST',
+            body: form
+        });
+        const json = await res.json();
+        if (json.code === 200) {
+            statusText.textContent = ' 添加成功';
+            document.getElementById('sponsorName').value = '';
+            document.getElementById('logoUrl').value = '';
+            document.getElementById('displayOrder').value = '0';
+            await loadSponsors();
+        } else {
+            alert('添加失败：' + json.msg);
+        }
+    }
+
+    function editSponsor(id, name, url, order, status) {
+        const newName = prompt('赞助商名称：', name);
+        if (newName === null) return;
+        const newUrl = prompt('Logo URL：', url);
+        if (newUrl === null) return;
+        const newOrder = prompt('显示顺序：', order);
+        if (newOrder === null) return;
+        const newStatus = confirm('是否显示？') ? 1 : 0;
+
+        updateSponsor(id, newName, newUrl, parseInt(newOrder) || 0, newStatus);
+    }
+
+    async function updateSponsor(id, name, url, order, status) {
+        const key = keyInput.value.trim();
+        if (!key) {
+            alert('请先填写密钥');
+            return;
+        }
+
+        const form = new FormData();
+        form.append('action', 'update');
+        form.append('key', key);
+        form.append('sponsor_id', id);
+        form.append('sponsor_name', name);
+        form.append('logo_url', url);
+        form.append('display_order', order);
+        form.append('status', status);
+
+        const res = await fetch(`${apiBase}/admin_sponsor.php`, {
+            method: 'POST',
+            body: form
+        });
+        const json = await res.json();
+        if (json.code === 200) {
+            statusText.textContent = ' 更新成功';
+            await loadSponsors();
+        } else {
+            alert('更新失败：' + json.msg);
+        }
+    }
+
+    async function deleteSponsor(id) {
+        if (!confirm('确定要删除这个赞助商吗？')) return;
+
+        const key = keyInput.value.trim();
+        if (!key) {
+            alert('请先填写密钥');
+            return;
+        }
+
+        const form = new FormData();
+        form.append('action', 'delete');
+        form.append('key', key);
+        form.append('sponsor_id', id);
+
+        const res = await fetch(`${apiBase}/admin_sponsor.php`, {
+            method: 'POST',
+            body: form
+        });
+        const json = await res.json();
+        if (json.code === 200) {
+            statusText.textContent = ' 删除成功';
+            await loadSponsors();
+        } else {
+            alert('删除失败：' + json.msg);
+        }
+    }
+
+    document.getElementById('loadBtn').addEventListener('click', loadSponsors);
+</script>
+</body>
+</html>
+

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>CMX 选手展示</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            height: 100%;
+            width: 100%;
+            background-color: #000;
+            color: #fff;
+            font-family: "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        .display-container {
+            display: none; /* Initially hidden */
+            width: 100%;
+            height: 100%;
+            display: flex;
+        }
+
+        .section {
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .logo-section {
+            background-color: #d90000;
+            flex: 2.5;
+            padding: 20px;
+        }
+        .logo-section img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .car-number-section {
+            background-color: #ffcc00;
+            flex: 1.5;
+            font-size: 15vw;
+            font-weight: 900;
+            color: #0033cc;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            padding: 0 clamp(16px, 2vw, 36px); /* 留边距不贴边 */
+        }
+
+        .player-name-section {
+            background: rgba(220, 38, 38, 0.85);
+            flex: 2;
+            --name-base-size: clamp(48px, 6vw, 96px); /* 基准字体大小（短名字保持这个大小） */
+            font-size: var(--name-base-size);
+            font-weight: 700;
+            color: #fff;
+            white-space: nowrap; /* 保持单行显示 */
+            overflow: hidden;   /* 超长时不让溢出，可配合缩小 */
+            padding: 0 clamp(16px, 2vw, 36px); /* 保留并自适应左右边距 */
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        #playerNameText {
+            display: inline-block;
+            white-space: nowrap;
+            line-height: 1;
+            font-weight: inherit;
+            font-size: inherit; /* 初始用基准字号，必要时由 JS 缩小 */
+        }
+
+        .player-photo-section {
+            background-color: #fff;
+            flex: 2;
+            overflow: hidden;
+        }
+        .player-photo-section img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .flag-section {
+            background-color: #d90000;
+            flex: 2;
+            padding: 20px;
+        }
+        .flag-section img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border: 5px solid #fff;
+            box-shadow: 0 0 25px rgba(255, 255, 255, 0.5);
+        }
+
+        .initial-message {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            font-size: 24px;
+            color: #9ca3af;
+        }
+
+        /* 切换动画样式 */
+        .swap-in {
+            animation: swapIn 600ms ease both;
+            will-change: transform, opacity, filter;
+        }
+        .delay-0 { animation-delay: 0ms; }
+        .delay-1 { animation-delay: 100ms; }
+        .delay-2 { animation-delay: 200ms; }
+        .delay-3 { animation-delay: 300ms; }
+        @keyframes swapIn {
+            0% { opacity: 0; transform: translateY(10px) scale(0.98); filter: blur(4px); }
+            100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="displayContainer" class="display-container">
+        <div class="section logo-section">
+            <img src="logo2.png" alt="CMX Logo">
+        </div>
+        <div id="carNumber" class="section car-number-section"></div>
+        <div id="playerName" class="section player-name-section"><span id="playerNameText"></span></div>
+        <div class="section player-photo-section">
+            <img id="playerPhoto" src="" alt="Player Photo">
+        </div>
+        <div class="section flag-section">
+            <img id="nationalityFlag" src="" alt="Nationality Flag">
+        </div>
+    </div>
+
+    <div id="initialMessage" class="initial-message">
+        等待后台指令，显示选手信息...
+    </div>
+
+    <script>
+        const apiBase = '/api';
+        let lastUpdateTime = null;
+
+        function getFlagUrl(nationality) {
+            const map = {
+                '中国': 'https://flagcdn.com/w320/cn.png',
+                '美国': 'https://flagcdn.com/w320/us.png',
+                '日本': 'https://flagcdn.com/w320/jp.png',
+                '法国': 'https://flagcdn.com/w320/fr.png',
+                '西班牙': 'https://flagcdn.com/w320/es.png',
+                '英国': 'https://flagcdn.com/w320/gb.png',
+                '意大利': 'https://flagcdn.com/w320/it.png',
+                '澳大利亚': 'https://flagcdn.com/w320/au.png',
+                '韩国': 'https://flagcdn.com/w320/kr.png',
+                '巴西': 'https://flagcdn.com/w320/br.png',
+                '加拿大': 'https://flagcdn.com/w320/ca.png',
+                '德国': 'https://flagcdn.com/w320/de.png'
+            };
+            return map[nationality] || 'https://flagcdn.com/w320/un.png';
+        }
+
+        // 让姓名在分栏内自适应，保留左右边距
+        function fitPlayerName() {
+            const section = document.getElementById('playerName');
+            const span = document.getElementById('playerNameText');
+            if (!section || !span) return;
+
+            const style = getComputedStyle(section);
+            const paddingLeft = parseFloat(style.paddingLeft) || 0;
+            const paddingRight = parseFloat(style.paddingRight) || 0;
+            const availableWidth = section.clientWidth - paddingLeft - paddingRight;
+
+            // 基准字体为 CSS 设定的 font-size，短名字保持此大小
+            const baseFont = parseFloat(style.fontSize) || 72;
+            span.style.fontSize = baseFont + 'px';
+
+            // 如果在基准字体下已经能放下，直接返回
+            if (span.scrollWidth <= availableWidth) {
+                return;
+            }
+
+            // 否则仅在超长时缩小，直到刚好放下
+            const minFont = 16;
+            let low = minFont, high = baseFont, best = minFont;
+            while (low <= high) {
+                const mid = Math.floor((low + high) / 2);
+                span.style.fontSize = mid + 'px';
+                const textWidth = span.scrollWidth;
+                if (textWidth <= availableWidth) {
+                    best = mid;
+                    low = mid + 1;
+                } else {
+                    high = mid - 1;
+                }
+            }
+            span.style.fontSize = best + 'px';
+        }
+
+        // 数据切换时触发入场动画（依次淡入）
+        function playSwapAnimation() {
+            const items = [
+                { el: document.getElementById('carNumber'), delay: 'delay-0' },
+                { el: document.getElementById('playerNameText'), delay: 'delay-1' },
+                { el: document.getElementById('playerPhoto'), delay: 'delay-2' },
+                { el: document.getElementById('nationalityFlag'), delay: 'delay-3' },
+            ];
+            items.forEach(({ el, delay }) => {
+                if (!el) return;
+                el.classList.remove('swap-in', 'delay-0', 'delay-1', 'delay-2', 'delay-3');
+                void el.offsetWidth; // 强制重排以便重播动画
+                el.classList.add('swap-in', delay);
+            });
+        }
+
+        async function fetchDisplayConfig() {
+            try {
+                const res = await fetch(`${apiBase}/display.php?action=getDisplayConfig&_t=${new Date().getTime()}`);
+                const json = await res.json();
+
+                if (json.code === 200 && json.data) {
+                    const { display_type, target_id, update_time, player_data } = json.data;
+
+                    if (update_time !== lastUpdateTime) {
+                        lastUpdateTime = update_time;
+
+                        if (display_type === 'player' && target_id > 0 && player_data) {
+                            document.getElementById('initialMessage').style.display = 'none';
+                            const container = document.getElementById('displayContainer');
+                            
+                            document.getElementById('carNumber').textContent = player_data.car_number;
+                            const nameSpan = document.getElementById('playerNameText');
+                            nameSpan.textContent = player_data.player_name;
+                            fitPlayerName();
+                            document.getElementById('playerPhoto').src = player_data.avatar_url;
+                            document.getElementById('nationalityFlag').src = getFlagUrl(player_data.nationality);
+
+                            playSwapAnimation(); // 播放切换动画
+                            container.style.display = 'flex';
+                        } else {
+                            document.getElementById('displayContainer').style.display = 'none';
+                            document.getElementById('initialMessage').style.display = 'flex';
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('获取显示配置失败:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchDisplayConfig();
+            setInterval(fetchDisplayConfig, 1000);
+            window.addEventListener('resize', fitPlayerName); // 窗口变化时重新适配
+        });
+    </script>
+
+</body>
+</html>

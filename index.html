@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>CMX 中国摩托车越野锦标赛 2025 - 实时排名</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            background: #0b1120;
+            color: #e5e7eb;
+        }
+        header {
+            padding: 16px 24px;
+            background: linear-gradient(90deg, #0f172a, #1d4ed8);
+            color: #f9fafb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+        #groupSelect {
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid #4b5563;
+            background: #020617;
+            color: #e5e7eb;
+        }
+        main {
+            padding: 16px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #020617;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #111827;
+            text-align: left;
+            font-size: 13px;
+        }
+        th {
+            background: #0f172a;
+            color: #9ca3af;
+            font-weight: 500;
+        }
+        tr:nth-child(even) {
+            background: #020617;
+        }
+        tr:nth-child(odd) {
+            background: #020617;
+        }
+        tr.highlight {
+            background: rgba(34, 197, 94, 0.08);
+            transition: background 0.5s ease-out;
+        }
+        tr.rank-up {
+            animation: rankUp 1.5s ease-out;
+        }
+        tr.rank-down {
+            animation: rankDown 1.5s ease-out;
+        }
+        @keyframes rankUp {
+            0% {
+                background-color: rgba(34, 197, 94, 0.3);
+                transform: translateX(-5px);
+            }
+            50% {
+                background-color: rgba(34, 197, 94, 0.5);
+            }
+            100% {
+                background-color: transparent;
+                transform: translateX(0);
+            }
+        }
+        @keyframes rankDown {
+            0% {
+                background-color: rgba(239, 68, 68, 0.3);
+                transform: translateX(5px);
+            }
+            50% {
+                background-color: rgba(239, 68, 68, 0.5);
+            }
+            100% {
+                background-color: transparent;
+                transform: translateX(0);
+            }
+        }
+        tbody tr {
+            transition: all 0.3s ease;
+        }
+        .rank-1 {
+            color: #f97316;
+            font-weight: 700;
+        }
+        .rank-2 {
+            color: #eab308;
+            font-weight: 600;
+        }
+        .rank-3 {
+            color: #22c55e;
+            font-weight: 600;
+        }
+        .status {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            margin-right: 4px;
+            background: #22c55e;
+        }
+        .flag {
+            font-size: 16px;
+            margin-right: 4px;
+        }
+        @media (max-width: 1024px) {
+            .col-entry-number {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+<header>
+    <div>
+        <h1>CMX 中国摩托车越野锦标赛 2025 - 实时排名</h1>
+        <div class="status">
+            <span class="status-dot" id="wsDot"></span>
+            <span id="wsStatus">连接中...</span>
+        </div>
+    </div>
+    <div style="display: flex; gap: 12px; align-items: center;">
+        <select id="groupSelect"></select>
+        <a href="entry_list.html" style="color: #e5e7eb; text-decoration: none; padding: 6px 12px; background: rgba(255,255,255,0.1); border-radius: 4px; font-size: 13px;">出场名单</a>
+    </div>
+</header>
+<main>
+    <table>
+        <thead>
+        <tr>
+            <th>名次</th>
+            <th>车号</th>
+            <th>选手</th>
+            <th>国籍</th>
+            <th>车队</th>
+            <th>圈速(秒)</th>
+            <th>差距(秒)</th>
+            <th class="col-entry-number">参赛序号</th>
+            <th>更新时间</th>
+        </tr>
+        </thead>
+        <tbody id="rankingBody">
+        </tbody>
+    </table>
+</main>
+<script>
+    // 线上环境使用域名根目录下的 /api
+    const apiBase = '/api';
+    let currentGroupId = null;
+    let ws = null;
+    let pollTimer = null;
+    let previousRanking = {}; // 保存上一次的排名数据，用于对比变化
+
+    async function fetchGroups() {
+        const res = await fetch(`${apiBase}/group.php?action=getList`);
+        const json = await res.json();
+        if (json.code !== 200) return;
+        const select = document.getElementById('groupSelect');
+        select.innerHTML = '';
+        json.data.forEach(g => {
+            const opt = document.createElement('option');
+            opt.value = g.group_id;
+            opt.textContent = `${g.group_name} (${g.group_code})`;
+            select.appendChild(opt);
+        });
+        if (json.data.length > 0) {
+            currentGroupId = json.data[0].group_id;
+            select.value = currentGroupId;
+            previousRanking = {}; // 初始加载时重置排名历史
+            await fetchRanking(currentGroupId);
+            connectWs(currentGroupId);
+        }
+        select.addEventListener('change', async () => {
+            currentGroupId = select.value;
+            previousRanking = {}; // 切换分组时重置排名历史
+            await fetchRanking(currentGroupId);
+            connectWs(currentGroupId);
+        });
+    }
+
+    async function fetchRanking(groupId) {
+        // 添加时间戳防止缓存
+        const timestamp = new Date().getTime();
+        const res = await fetch(`${apiBase}/ranking.php?action=getGroupRanking&group_id=${groupId}&_t=${timestamp}`, {
+            cache: 'no-cache',
+            headers: {
+                'Cache-Control': 'no-cache'
+            }
+        });
+        const json = await res.json();
+        if (json.code !== 200) return;
+        // 确保按排名排序
+        const sortedList = json.data.ranking_list.sort((a, b) => {
+            return (parseInt(a.current_rank) || 0) - (parseInt(b.current_rank) || 0);
+        });
+        renderRanking(sortedList);
+    }
+
+    function getFlag(nationality) {
+        const map = {
+            '中国': '🇨🇳',
+            '中国大陆': '🇨🇳',
+            '香港': '🇭🇰',
+            '澳门': '🇲🇴',
+            '台湾': '🇹🇼',
+            '美国': '🇺🇸',
+            '日本': '🇯🇵',
+            '韩国': '🇰🇷',
+            '英国': '🇬🇧',
+            '法国': '🇫🇷',
+            '德国': '🇩🇪',
+            '意大利': '🇮🇹',
+            '西班牙': '🇪🇸',
+            '澳大利亚': '🇦🇺'
+        };
+        return map[nationality] || '🏁';
+    }
+
+    function renderRanking(list) {
+        const tbody = document.getElementById('rankingBody');
+        
+        // 确保按排名排序（双重保险）
+        const sortedList = [...list].sort((a, b) => {
+            return (parseInt(a.current_rank) || 0) - (parseInt(b.current_rank) || 0);
+        });
+        
+        // 检测排名变化
+        const currentRanking = {};
+        sortedList.forEach(row => {
+            currentRanking[row.player_id] = parseInt(row.current_rank) || 0;
+        });
+        
+        // 清空表格
+        tbody.innerHTML = '';
+        
+        // 渲染新数据
+        sortedList.forEach(row => {
+            const tr = document.createElement('tr');
+            const rank = parseInt(row.current_rank) || 0;
+            const playerId = row.player_id;
+            const previousRank = previousRanking[playerId];
+            
+            // 检测排名变化并添加动画类
+            if (previousRank && previousRank !== rank) {
+                if (previousRank > rank) {
+                    // 排名上升
+                    tr.classList.add('rank-up');
+                } else if (previousRank < rank) {
+                    // 排名下降
+                    tr.classList.add('rank-down');
+                }
+                // 动画结束后移除类
+                setTimeout(() => {
+                    tr.classList.remove('rank-up', 'rank-down');
+                }, 1500);
+            }
+            
+            if (rank === 1) tr.classList.add('rank-1');
+            else if (rank === 2) tr.classList.add('rank-2');
+            else if (rank === 3) tr.classList.add('rank-3');
+            
+            const flag = getFlag(row.nationality || '');
+            tr.innerHTML = `
+                <td>${rank}</td>
+                <td>${row.car_number}</td>
+                <td>${row.player_name}</td>
+                <td><span class="flag">${flag}</span>${row.nationality || ''}</td>
+                <td>${row.team_name}</td>
+                <td>${row.lap_time ?? '-'}</td>
+                <td>${row.gap_time ?? '-'}</td>
+                <td class="col-entry-number">${row.entry_number}</td>
+                <td>${row.update_time}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+        
+        // 更新上一次排名数据
+        previousRanking = currentRanking;
+    }
+
+    function setWsStatus(ok) {
+        const dot = document.getElementById('wsDot');
+        const txt = document.getElementById('wsStatus');
+        if (ok) {
+            dot.style.background = '#22c55e';
+            txt.textContent = '实时连接正常';
+        } else {
+            dot.style.background = '#f97316';
+            txt.textContent = '连接断开，重试中...';
+        }
+    }
+
+    function startPolling() {
+        if (pollTimer) {
+            clearInterval(pollTimer);
+        }
+        // 立即拉取一次
+        if (currentGroupId) {
+            fetchRanking(currentGroupId);
+        }
+        // 然后每秒拉取一次
+        pollTimer = setInterval(() => {
+            if (currentGroupId) {
+                fetchRanking(currentGroupId);
+            }
+        }, 1000); // 每秒拉取一次
+        setWsStatus(false);
+    }
+
+    function connectWs(groupId) {
+        if (ws) {
+            ws.close();
+            ws = null;
+        }
+        const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+        const url = `${proto}://${location.host}/websocket/RankingWebSocket.php?group_id=${groupId}`;
+        try {
+            ws = new WebSocket(url);
+        } catch (e) {
+            startPolling();
+            return;
+        }
+        ws.onopen = () => {
+            setWsStatus(true);
+            if (pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        };
+        ws.onclose = () => {
+            startPolling();
+        };
+        ws.onerror = () => startPolling();
+        ws.onmessage = evt => {
+            try {
+                const msg = JSON.parse(evt.data);
+                if (msg.type === 'ranking_update' && msg.group_id == currentGroupId) {
+                    // 简单策略：重新拉取完整排名列表
+                    fetchRanking(currentGroupId);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        };
+    }
+
+    // 页面可见性检测：当页面重新可见时立即刷新数据
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && currentGroupId) {
+            fetchRanking(currentGroupId);
+        }
+    });
+
+    // 窗口获得焦点时刷新数据
+    window.addEventListener('focus', () => {
+        if (currentGroupId) {
+            fetchRanking(currentGroupId);
+        }
+    });
+
+    fetchGroups();
+</script>
+</body>
+</html>
+
+

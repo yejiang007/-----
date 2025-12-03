@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>CMX 出场顺序管理</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            background: #0b1120;
+            color: #e5e7eb;
+        }
+        header {
+            padding: 12px 16px;
+            background: #020617;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #111827;
+        }
+        main {
+            padding: 12px 16px;
+        }
+        select, input, button {
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #4b5563;
+            background: #020617;
+            color: #e5e7eb;
+            font-size: 13px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            background: #020617;
+        }
+        th, td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #111827;
+            font-size: 12px;
+        }
+        th {
+            background: #0f172a;
+            color: #9ca3af;
+        }
+        tbody tr {
+            transition: background-color 0.2s ease;
+        }
+        tbody tr:hover {
+            background-color: rgba(59, 130, 246, 0.15) !important;
+            cursor: pointer;
+        }
+        .status {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+        .rank-btn {
+            padding: 2px 6px;
+            font-size: 11px;
+            margin-left: 4px;
+        }
+        .quick-actions {
+            margin: 12px 0;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .quick-actions button {
+            padding: 6px 12px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .quick-actions button:hover {
+            background: #1e293b;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <div>
+        <strong>CMX 出场顺序管理</strong>
+        <span class="status" id="statusText"></span>
+    </div>
+    <div>
+        分组：
+        <select id="groupSelect"></select>
+        &nbsp;密钥：
+        <input type="password" id="keyInput" placeholder="admin key" style="width: 140px;">
+        <button id="loadBtn">加载</button>
+    </div>
+</header>
+<main>
+    <div class="quick-actions">
+        <button onclick="resetOrder()">🔄 重置顺序(1-N)</button>
+        <span style="margin-left: 12px; color: #9ca3af; font-size: 12px;">提示：F2 保存全部修改</span>
+    </div>
+    <table>
+        <thead>
+        <tr>
+            <th>出场顺序</th>
+            <th>车号</th>
+            <th>选手</th>
+            <th>国籍</th>
+            <th>车队</th>
+            <th>操作</th>
+        </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+    </table>
+</main>
+<script>
+    const apiBase = '/api';
+    const groupSelect = document.getElementById('groupSelect');
+    const keyInput = document.getElementById('keyInput');
+    const tbody = document.getElementById('tbody');
+    const statusText = document.getElementById('statusText');
+
+    async function loadGroups() {
+        const res = await fetch(`${apiBase}/group.php?action=getList`);
+        const json = await res.json();
+        if (json.code !== 200) {
+            statusText.textContent = ' 获取分组失败';
+            return;
+        }
+        groupSelect.innerHTML = '';
+        json.data.forEach(g => {
+            const opt = document.createElement('option');
+            opt.value = g.group_id;
+            opt.textContent = `${g.group_name}(${g.group_code})`;
+            groupSelect.appendChild(opt);
+        });
+    }
+
+    async function loadEntryList() {
+        const key = keyInput.value.trim();
+        const groupId = groupSelect.value;
+        if (!key || !groupId) {
+            alert('请先填写密钥并选择分组');
+            return;
+        }
+        const url = `${apiBase}/admin_entry_order.php?action=list&group_id=${groupId}&key=${encodeURIComponent(key)}`;
+        const res = await fetch(url);
+        const json = await res.json();
+        if (json.code !== 200) {
+            statusText.textContent = ' 加载失败：' + json.msg;
+            tbody.innerHTML = '';
+            return;
+        }
+        statusText.textContent = ' 已加载 ' + json.data.entry_list.length + ' 条';
+        renderTable(json.data.entry_list);
+    }
+
+    function renderTable(list) {
+        tbody.innerHTML = '';
+        list.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="number" value="${row.entry_order ?? ''}" style="width:60px" data-field="entry_order" data-player="${row.player_id}"></td>
+                <td>${row.car_number}</td>
+                <td>${row.player_name}</td>
+                <td>${row.nationality}</td>
+                <td>${row.team_name}</td>
+                <td>
+                    <button class="rank-btn" onclick="moveRowUp(this)" title="上移">↑</button>
+                    <button class="rank-btn" onclick="moveRowDown(this)" title="下移">↓</button>
+                    <button data-player="${row.player_id}">保存</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        tbody.querySelectorAll('button[data-player]').forEach(btn => {
+            btn.addEventListener('click', () => saveSingle(btn));
+        });
+    }
+
+    async function saveSingle(btn) {
+        const tr = btn.closest('tr');
+        const entryOrderInput = tr.querySelector('input[data-field="entry_order"]');
+        const playerId = btn.getAttribute('data-player');
+        const entryOrder = entryOrderInput.value ? parseInt(entryOrderInput.value) : null;
+        
+        const form = new FormData();
+        form.append('action', 'update');
+        form.append('key', keyInput.value.trim());
+        form.append('player_id', playerId);
+        form.append('entry_order', entryOrder || '');
+
+        const res = await fetch(`${apiBase}/admin_entry_order.php`, {
+            method: 'POST',
+            body: form
+        });
+        const json = await res.json();
+        if (json.code === 200) {
+            statusText.textContent = ' 已保存选手 ' + playerId;
+        } else {
+            alert('保存失败：' + json.msg);
+        }
+    }
+
+    async function saveAll() {
+        const buttons = Array.from(tbody.querySelectorAll('button[data-player]'));
+        if (buttons.length === 0) {
+            statusText.textContent = ' 没有可保存的数据';
+            return;
+        }
+        statusText.textContent = ` 正在保存 ${buttons.length} 条出场顺序...`;
+        let successCount = 0;
+        let failCount = 0;
+        for (const btn of buttons) {
+            try {
+                await saveSingle(btn);
+                successCount++;
+            } catch (e) {
+                failCount++;
+            }
+        }
+        if (failCount === 0) {
+            statusText.textContent = ` ✅ 已成功保存所有 ${successCount} 条出场顺序`;
+        } else {
+            statusText.textContent = ` ⚠️ 保存完成：成功 ${successCount} 条，失败 ${failCount} 条`;
+        }
+        await loadEntryList();
+    }
+
+    function moveRowUp(btn) {
+        const tr = btn.closest('tr');
+        const prevTr = tr.previousElementSibling;
+        if (!prevTr) return;
+        const orderInput = tr.querySelector('input[data-field="entry_order"]');
+        const prevOrderInput = prevTr.querySelector('input[data-field="entry_order"]');
+        const temp = orderInput.value;
+        orderInput.value = prevOrderInput.value;
+        prevOrderInput.value = temp;
+        tr.parentNode.insertBefore(tr, prevTr);
+    }
+
+    function moveRowDown(btn) {
+        const tr = btn.closest('tr');
+        const nextTr = tr.nextElementSibling;
+        if (!nextTr) return;
+        const orderInput = tr.querySelector('input[data-field="entry_order"]');
+        const nextOrderInput = nextTr.querySelector('input[data-field="entry_order"]');
+        const temp = orderInput.value;
+        orderInput.value = nextOrderInput.value;
+        nextOrderInput.value = temp;
+        tr.parentNode.insertBefore(nextTr, tr);
+    }
+
+    function resetOrder() {
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        rows.forEach((row, idx) => {
+            const orderInput = row.querySelector('input[data-field="entry_order"]');
+            if (orderInput) orderInput.value = idx + 1;
+        });
+    }
+
+    document.getElementById('loadBtn').addEventListener('click', loadEntryList);
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'F2') {
+            e.preventDefault();
+            saveAll();
+        }
+    });
+
+    loadGroups();
+</script>
+</body>
+</html>
+
